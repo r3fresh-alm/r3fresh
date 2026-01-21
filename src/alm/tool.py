@@ -1,2 +1,0 @@
-"""Tool module for ALM."""
-
