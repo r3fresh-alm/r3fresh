@@ -1,0 +1,71 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "r3fresh"
+dynamic = ["version"]
+description = 'Agent Lifecycle Management SDK - Track, monitor, and manage AI agent execution with policy enforcement and comprehensive analytics'
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+keywords = []
+authors = [
+  { name = "r3fresh", email = "support@r3fresh.dev" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+    "pydantic",
+    "httpx",
+]
+
+[project.urls]
+Homepage = "https://r3fresh.dev"
+Documentation = "https://docs.r3fresh.dev"
+
+[tool.hatch.version]
+path = "src/r3fresh/__about__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/r3fresh"]
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+]
+
+[tool.hatch.envs.default]
+dependencies = [
+  "pytest",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/r3fresh tests}"
+
+[tool.coverage.run]
+source_pkgs = ["r3fresh", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/r3fresh/__about__.py",
+]
+
+[tool.coverage.paths]
+r3fresh = ["src/r3fresh", "*/r3fresh/src/r3fresh"]
+tests = ["tests", "*/r3fresh/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
