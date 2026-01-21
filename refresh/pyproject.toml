@@ -37,6 +37,9 @@ Source = "https://github.com/zengjosh/alm-sdk"
 [tool.hatch.version]
 path = "src/alm_sdk/__about__.py"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/alm_sdk"]
+
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
