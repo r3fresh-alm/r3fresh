@@ -54,6 +54,7 @@ def tool(
 
                 # Emit tool.request
                 request_event = tool_request_event(
+                    event_id=new_id(),
                     timestamp=utc_now_iso(),
                     agent_id=alm_instance.agent_id,
                     env=alm_instance.env,
@@ -75,6 +76,7 @@ def tool(
                 if not allowed:
                     # Emit policy.decision deny
                     decision_event = policy_decision_event(
+                        event_id=new_id(),
                         timestamp=utc_now_iso(),
                         agent_id=alm_instance.agent_id,
                         env=alm_instance.env,
@@ -97,6 +99,7 @@ def tool(
                         source="policy",
                     )
                     denied_response_event = tool_response_event(
+                        event_id=new_id(),
                         timestamp=utc_now_iso(),
                         agent_id=alm_instance.agent_id,
                         env=alm_instance.env,
@@ -131,6 +134,7 @@ def tool(
 
                 # Emit policy.decision allow
                 decision_event = policy_decision_event(
+                    event_id=new_id(),
                     timestamp=utc_now_iso(),
                     agent_id=alm_instance.agent_id,
                     env=alm_instance.env,
@@ -162,6 +166,7 @@ def tool(
                     total_latency_ms = (time.time() - total_start_time) * 1000
 
                     response_event = tool_response_event(
+                        event_id=new_id(),
                         timestamp=utc_now_iso(),
                         agent_id=alm_instance.agent_id,
                         env=alm_instance.env,
@@ -228,6 +233,7 @@ def tool(
                     # No retry or max retries reached - emit error response
                     status = "error"
                     response_event = tool_response_event(
+                        event_id=new_id(),
                         timestamp=utc_now_iso(),
                         agent_id=alm_instance.agent_id,
                         env=alm_instance.env,

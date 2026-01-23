@@ -132,6 +132,7 @@ class ALM:
             self._current_run.record_handoff()
 
         event = handoff_event(
+            event_id=new_id(),
             timestamp=utc_now_iso(),
             agent_id=self.agent_id,
             env=self.env,
@@ -181,6 +182,7 @@ class TaskContext:
         self.task_id = new_id()
 
         event = task_start_event(
+            event_id=new_id(),
             timestamp=utc_now_iso(),
             agent_id=self.alm.agent_id,
             env=self.alm.env,
@@ -206,6 +208,7 @@ class TaskContext:
             error = create_structured_error(exc_val, source="agent")
 
         event = task_end_event(
+            event_id=new_id(),
             timestamp=utc_now_iso(),
             agent_id=self.alm.agent_id,
             env=self.alm.env,

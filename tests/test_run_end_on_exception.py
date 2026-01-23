@@ -50,6 +50,7 @@ def test_run_end_on_exception():
         assert run_end is not None
         assert run_end["metadata"]["success"] is False
         assert "error" in run_end["metadata"]
-        assert "ValueError" in run_end["metadata"]["error"]
+        err = run_end["metadata"]["error"]
+        assert isinstance(err, dict) and err.get("type") == "ValueError"
 
         sys.stdout = original_stdout

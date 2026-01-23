@@ -15,7 +15,8 @@ SCHEMA_VERSION = "1.0"
 class Event(BaseModel):
     """Base event with common fields."""
 
-    timestamp: str = Field(..., description="ISO timestamp")
+    event_id: str = Field(..., description="Unique event ID (UUID) for idempotency and deduplication")
+    timestamp: str = Field(..., description="RFC3339 timestamp")
     event_type: str = Field(..., description="Type of event")
     agent_id: str = Field(..., description="Agent identifier")
     env: str = Field(..., description="Environment name")
@@ -32,7 +33,8 @@ class Event(BaseModel):
 
         json_schema_extra = {
             "example": {
-                "timestamp": "2026-01-01T00:00:00Z",
+                "event_id": "550e8400-e29b-41d4-a716-446655440000",
+                "timestamp": "2026-01-01T00:00:00.000Z",
                 "event_type": "run.start",
                 "agent_id": "agent-123",
                 "env": "production",
@@ -43,6 +45,7 @@ class Event(BaseModel):
 
 
 def run_start_event(
+    event_id: str,
     timestamp: str,
     agent_id: str,
     env: str,
@@ -56,6 +59,7 @@ def run_start_event(
     if purpose:
         metadata["purpose"] = purpose
     return Event(
+        event_id=event_id,
         timestamp=timestamp,
         event_type="run.start",
         agent_id=agent_id,
@@ -68,6 +72,7 @@ def run_start_event(
 
 
 def run_end_event(
+    event_id: str,
     timestamp: str,
     agent_id: str,
     env: str,
@@ -115,6 +120,7 @@ def run_end_event(
     if error:
         metadata["error"] = error
     return Event(
+        event_id=event_id,
         timestamp=timestamp,
         event_type="run.end",
         agent_id=agent_id,
@@ -127,6 +133,7 @@ def run_end_event(
 
 
 def tool_request_event(
+    event_id: str,
     timestamp: str,
     agent_id: str,
     env: str,
@@ -140,6 +147,7 @@ def tool_request_event(
 ) -> Event:
     """Create a tool.request event."""
     return Event(
+        event_id=event_id,
         timestamp=timestamp,
         event_type="tool.request",
         agent_id=agent_id,
@@ -157,6 +165,7 @@ def tool_request_event(
 
 
 def tool_response_event(
+    event_id: str,
     timestamp: str,
     agent_id: str,
     env: str,
@@ -190,6 +199,7 @@ def tool_response_event(
     if result is not None:
         metadata["result"] = result
     return Event(
+        event_id=event_id,
         timestamp=timestamp,
         event_type="tool.response",
         agent_id=agent_id,
@@ -202,6 +212,7 @@ def tool_response_event(
 
 
 def policy_decision_event(
+    event_id: str,
     timestamp: str,
     agent_id: str,
     env: str,
@@ -217,6 +228,7 @@ def policy_decision_event(
 ) -> Event:
     """Create a policy.decision event."""
     return Event(
+        event_id=event_id,
         timestamp=timestamp,
         event_type="policy.decision",
         agent_id=agent_id,
@@ -236,6 +248,7 @@ def policy_decision_event(
 
 
 def task_start_event(
+    event_id: str,
     timestamp: str,
     agent_id: str,
     env: str,
@@ -253,6 +266,7 @@ def task_start_event(
     if description:
         metadata["description"] = description
     return Event(
+        event_id=event_id,
         timestamp=timestamp,
         event_type="task.start",
         agent_id=agent_id,
@@ -265,6 +279,7 @@ def task_start_event(
 
 
 def task_end_event(
+    event_id: str,
     timestamp: str,
     agent_id: str,
     env: str,
@@ -283,6 +298,7 @@ def task_end_event(
     if error:
         metadata["error"] = error
     return Event(
+        event_id=event_id,
         timestamp=timestamp,
         event_type="task.end",
         agent_id=agent_id,
@@ -295,6 +311,7 @@ def task_end_event(
 
 
 def handoff_event(
+    event_id: str,
     timestamp: str,
     agent_id: str,
     env: str,
@@ -316,6 +333,7 @@ def handoff_event(
     if context:
         metadata["context"] = context
     return Event(
+        event_id=event_id,
         timestamp=timestamp,
         event_type="handoff",
         agent_id=agent_id,

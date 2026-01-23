@@ -6,7 +6,7 @@ import time
 from typing import Dict, Optional
 
 from .events import run_end_event, run_start_event
-from .util import create_structured_error, utc_now_iso
+from .util import create_structured_error, new_id, utc_now_iso
 
 
 class Run:
@@ -44,6 +44,7 @@ class Run:
         self._start_time = time.time()
 
         event = run_start_event(
+            event_id=new_id(),
             timestamp=utc_now_iso(),
             agent_id=self.alm.agent_id,
             env=self.alm.env,
@@ -85,6 +86,7 @@ class Run:
         )
 
         event = run_end_event(
+            event_id=new_id(),
             timestamp=utc_now_iso(),
             agent_id=self.alm.agent_id,
             env=self.alm.env,

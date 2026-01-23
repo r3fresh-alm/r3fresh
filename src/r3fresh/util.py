@@ -9,8 +9,9 @@ from uuid import uuid4
 
 
 def utc_now_iso() -> str:
-    """Return current UTC time as ISO format string."""
-    return datetime.now(timezone.utc).isoformat()
+    """Return current UTC time as RFC3339 / ISO 8601 string (e.g. 2026-01-21T12:00:00.123456Z)."""
+    now = datetime.now(timezone.utc)
+    return now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
 def new_id() -> str:

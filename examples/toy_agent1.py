@@ -1,139 +1,117 @@
 """
-Toy agent exercising most ALM SDK features.
+Toy agent for r3fresh ALM SDK
 
-What this tests (stdout mode):
-- run.start / run.end (with summary)
+What this tests:
+- run.start / run.end with summary stats
 - tool.request / policy.decision / tool.response
-- allowed tools, denied tools
-- task.start / task.end (success + failure)
+- allow/deny policy (denied tool raises PermissionError)
+- tool latency visibility (simulated sleeps)
+- task.start / task.end
 - handoff event
-- retry logic (tool raises retryable error, then succeeds)
-- structured error object
-- max_tool_calls_per_run budget behavior (optional)
-- flush()
+- structured errors on tool failure
 """
 
 from __future__ import annotations
 
 import os
 import time
-from typing import Dict
+from typing import Dict, Any
 
 from r3fresh import ALM
 
 
 def main() -> None:
-    # You can optionally set these for testing version propagation:
-    agent_version = os.getenv("ALM_AGENT_VERSION", "1.0.0-dev")
-    policy_version = os.getenv("ALM_POLICY_VERSION", "policy-dev-1")
+    # Toggle these to test different sinks
+    mode = os.getenv("ALM_MODE", "stdout")  # "stdout" or "http"
+    endpoint = os.getenv("ALM_ENDPOINT")    # required if mode == "http"
+    api_key = os.getenv("ALM_API_KEY")      # optional
 
-    # If you implemented budget limiting, set small number to verify behavior.
-    # If not implemented yet, set to None or remove.
     alm = ALM(
-        agent_id="toy-agent-full",
-        env="development",
-        mode="stdout",
-        agent_version=agent_version,
-        policy_version=policy_version,
-        denied_tools={"dangerous_tool"},
-        default_allow=True,
-        max_tool_calls_per_run=50,  # adjust lower if you want to test budget exhaustion
+        agent_id="toy-agent-1",
+        env=os.getenv("ALM_ENV", "development"),
+        mode=mode,
+        endpoint=endpoint,
+        api_key=api_key,
+        agent_version="0.0.1-toy",
+        policy_version="0.0.1-policy",
+        # Demonstrate policy behavior:
+        allowed_tools={"safe_tool", "flaky_tool", "slow_tool"},  # whitelist
+        denied_tools={"dangerous_tool"},                         # blacklist
+        default_allow=False,                                     # enforce whitelist
+        max_tool_calls_per_run=25,
     )
 
-    # -------------------------
-    # Tools
-    # -------------------------
+    # --- Tools ---------------------------------------------------------------
 
     @alm.tool("safe_tool")
     def safe_tool(message: str) -> str:
-        """Echo tool to test normal allowed execution."""
+        """Always succeeds; quick tool."""
         return f"Safe: {message}"
 
-    @alm.tool("dangerous_tool")
-    def dangerous_tool(action: str) -> str:
-        """Should be denied by policy."""
-        return f"Dangerous action: {action}"
-
-    # Retry test: fail twice with TimeoutError, then succeed.
-    _retry_state: Dict[str, int] = {"calls": 0}
+    @alm.tool("slow_tool")
+    def slow_tool(ms: int) -> str:
+        """Sleeps to make tool latency visible."""
+        time.sleep(ms / 1000.0)
+        return f"Slept {ms}ms"
 
     @alm.tool("flaky_tool")
-    def flaky_tool(resource: str) -> str:
-        """
-        Simulates a transient failure.
-        Raises TimeoutError on first two calls, then returns success.
-        """
-        _retry_state["calls"] += 1
-        if _retry_state["calls"] <= 2:
-            raise TimeoutError(f"Simulated timeout talking to {resource}")
-        return f"Fetched {resource} after retries"
+    def flaky_tool(should_fail: bool) -> Dict[str, Any]:
+        """Fails on demand to test structured error capture."""
+        if should_fail:
+            raise ConnectionError("Simulated connection timeout")
+        return {"ok": True}
 
-    @alm.tool("non_retryable_fail")
-    def non_retryable_fail() -> None:
-        """Always fails with a non-retryable error."""
-        raise ValueError("Simulated non-retryable failure")
+    @alm.tool("dangerous_tool")
+    def dangerous_tool() -> None:
+        """Should be denied by policy."""
+        # If policy enforcement works, you should never see this line execute.
+        raise RuntimeError("If you see this, policy did not deny the tool!")
 
-    # -------------------------
-    # Run
-    # -------------------------
-    with alm.run(purpose="Exercise ALM SDK full feature set"):
-        # Task 1: success path with a safe tool call
-        with alm.task(task_type="demo", description="Happy path task"):
+    # --- Agent logic ---------------------------------------------------------
+
+    print(f"Mode: {mode}")
+    if mode == "http":
+        print(f"Endpoint: {endpoint!r} (SDK should POST to {endpoint}/v1/events)")
+
+    with alm.run(purpose="Toy agent smoke test"):
+        # Task 1: happy path tools
+        with alm.task(description="Happy path tools"):
             print("Calling safe_tool...")
             print(safe_tool("Hello, World!"))
 
-        # Task 2: denied tool (policy enforcement)
-        with alm.task(task_type="demo", description="Denied tool task"):
-            print("\nTrying dangerous_tool (should be denied)...")
+            print("Calling slow_tool...")
+            print(slow_tool(150))
+
+        # Task 2: denied tool
+        with alm.task(description="Policy deny test"):
+            print("\nTrying to call dangerous_tool...")
             try:
-                print(dangerous_tool("delete everything"))
+                dangerous_tool()
             except PermissionError as e:
-                print(f"Expected deny: {e}")
-
-        # Task 3: retry path
-        with alm.task(task_type="demo", description="Retry logic task"):
-            print("\nCalling flaky_tool (should retry then succeed)...")
-            # If your SDK retries automatically, this should succeed without the caller looping.
-            # If you haven't implemented retries yet, you will see the exception and can add a
-            # manual retry loop here temporarily.
-            try:
-                print(flaky_tool("example_resource"))
-            except TimeoutError as e:
-                # If auto-retry is not implemented yet, fall back to manual retry so you can
-                # still validate event emission structure.
-                print(f"Auto-retry not active (caught): {e}")
-                for i in range(3):
-                    try:
-                        time.sleep(0.05)
-                        print(flaky_tool("example_resource"))
-                        break
-                    except TimeoutError as e2:
-                        print(f"Manual retry {i+1} failed: {e2}")
-
-        # Task 4: non-retryable error path
-        with alm.task(task_type="demo", description="Non-retryable error task"):
-            print("\nCalling non_retryable_fail (should error)...")
-            try:
-                non_retryable_fail()
-            except ValueError as e:
                 print(f"Expected error: {e}")
 
-        # Handoff event
-        print("\nEmitting handoff...")
+        # Task 3: error capture
+        with alm.task(description="Error capture test"):
+            print("\nCalling flaky_tool (forced failure)...")
+            try:
+                flaky_tool(True)
+            except Exception as e:
+                # SDK should emit tool.response with status="error" + structured error metadata
+                print(f"Expected failure: {type(e).__name__}: {e}")
+
+        # Handoff (emits a handoff event)
         alm.handoff(
-            to_agent_id="toy-agent-specialist",
+            to_agent_id="next-agent",
             reason="Demonstrate handoff event emission",
-            context={"ticket_id": "TICKET-123", "notes": "Needs specialist review"},
+            context={"note": "handoff triggered after tests"},
         )
 
-        # Additional safe tool call (verifies normal flow continues)
-        with alm.task(task_type="demo", description="Final task"):
-            print("\nCalling safe_tool again...")
-            print(safe_tool("Goodbye!"))
-
-    # Flush remaining events
-    alm.flush()
-    print("\nToy agent full test completed. Inspect stdout JSON events.")
+    # Optional: explicit flush if you want to confirm manual flushing too
+    try:
+        alm.flush()
+    except Exception:
+        # Your SDK says it should catch flush failures; this is just belt-and-suspenders.
+        pass
 
 
 if __name__ == "__main__":

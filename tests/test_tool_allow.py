@@ -47,6 +47,7 @@ def test_tool_allow():
         # Find run.start event
         run_start = next((e for e in events if e["event_type"] == "run.start"), None)
         assert run_start is not None
+        assert "event_id" in run_start, "SDK must emit event_id for idempotency"
 
         # Find tool.request event
         tool_request = next((e for e in events if e["event_type"] == "tool.request"), None)

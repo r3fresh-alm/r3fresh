@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "r3fresh"
 dynamic = ["version"]
-description = 'Agent Lifecycle Management SDK - Track, monitor, and manage AI agent execution with policy enforcement and comprehensive analytics'
+description = 'Agent Lifecycle Management SDK - Track AI agent execution with policy enforcement, event emission, and structured events for downstream analytics'
 readme = "README.md"
 requires-python = ">=3.8"
 license = "MIT"

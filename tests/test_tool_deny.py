@@ -56,6 +56,7 @@ def test_tool_deny():
         # Find tool.request event
         tool_request = next((e for e in events if e["event_type"] == "tool.request"), None)
         assert tool_request is not None
+        assert "event_id" in tool_request, "SDK must emit event_id for idempotency"
         assert tool_request["metadata"]["tool_name"] == "blocked_tool"
         assert "tool_call_id" in tool_request["metadata"]
         tool_call_id = tool_request["metadata"]["tool_call_id"]

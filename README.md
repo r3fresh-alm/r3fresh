@@ -3,19 +3,19 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/r3fresh.svg)](https://pypi.org/project/r3fresh)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/r3fresh.svg)](https://pypi.org/project/r3fresh)
 
-**Agent Lifecycle Management SDK** - A Python SDK for tracking, monitoring, and managing AI agent execution with policy enforcement, event tracking, and comprehensive analytics.
+**Agent Lifecycle Management SDK** – A Python SDK for tracking AI agent execution with policy enforcement, event emission, and structured event data for downstream analytics.
 
 ## Overview
 
-The ALM SDK provides automatic instrumentation for AI agents, capturing:
-- Tool calls with policy enforcement
-- Run lifecycle tracking
-- Task management
-- Agent-to-agent handoffs
-- Comprehensive metrics and analytics
-- Structured error tracking with retry logic
+The SDK provides automatic instrumentation for AI agents, capturing:
+- **Tool calls** with policy enforcement (allow/deny) and latency tracking
+- **Run lifecycle** (`run.start` / `run.end`) with summary statistics
+- **Tasks** (`task.start` / `task.end`) for logical units of work
+- **Handoffs** for agent-to-agent transitions
+- **Structured errors** (type, message, source, retryable) in tool and run events
+- **Version tracking** (schema, SDK, agent, policy) on every event
 
-All events are automatically captured and can be sent to stdout (for development) or HTTP endpoints (for production monitoring).
+All events are emitted automatically. They can be sent to **stdout** (development) or an **HTTP endpoint** (production). The SDK does not perform analytics itself; it produces events for your backend or analytics pipeline.
 
 ## Installation
 
@@ -40,8 +40,8 @@ from r3fresh import ALM
 alm = ALM(
     agent_id="my-agent",
     env="development",
-    mode="stdout",  # or "http" with endpoint
-    agent_version="1.0.0"
+    mode="stdout",  # or "http" with endpoint (base URL)
+    agent_version="1.0.0",
 )
 
 # Define tools with automatic policy enforcement
@@ -71,11 +71,11 @@ The `ALM` class is the main entry point that manages:
 
 ```python
 alm = ALM(
-    agent_id="unique-agent-id",      # Required: Unique identifier
+    agent_id="unique-agent-id",       # Required: Unique identifier
     env="production",                 # Environment name
     mode="http",                      # "stdout" or "http"
-    endpoint="https://api.example.com/v1/events",  # Required for http mode
-    api_key="your-api-key",           # Optional: For authenticated endpoints
+    endpoint="https://api.example.com",  # Base URL for http mode; SDK POSTs to /v1/events
+    api_key="your-api-key",           # Optional: Sent as Authorization: Bearer <key>
     agent_version="1.2.3",            # Optional: Agent version
     policy_version="2.0.0",           # Optional: Policy version
     allowed_tools={"tool1", "tool2"}, # Optional: Whitelist tools
@@ -100,10 +100,9 @@ with alm.run(purpose="Answer user question"):
 
 Tools are automatically instrumented with:
 - Policy enforcement (allow/deny)
-- Latency tracking (policy, tool, total)
-- Error handling with structured errors
-- Automatic retry logic for retryable errors
-- Attempt and retry counting
+- Latency tracking (`policy_latency_ms`, `tool_latency_ms`, `total_latency_ms`)
+- Structured errors (type, message, source, retryable) on failure or deny
+- `attempt` and `retries` in events (retry infrastructure exists but retries are disabled by default)
 
 ```python
 @alm.tool("my_tool")  # Optional: specify tool name
@@ -141,10 +140,12 @@ alm.handoff(
 ### Automatic Event Tracking
 
 The SDK automatically captures:
-- **Run lifecycle**: `run.start`, `run.end` with summary statistics
-- **Tool execution**: `tool.request`, `policy.decision`, `tool.response`
+- **Run lifecycle**: `run.start`, `run.end` (with summary stats in `run.end` metadata)
+- **Tool execution**: `tool.request`, `policy.decision`, `tool.response` (including `status="denied"` when blocked)
 - **Task tracking**: `task.start`, `task.end`
 - **Handoffs**: `handoff` events
+
+Every event includes a unique `event_id` (UUID) for idempotency and deduplication.
 
 ### Policy Enforcement
 
@@ -164,14 +165,14 @@ alm = ALM(
 
 ### Structured Error Handling
 
-Errors are automatically structured with:
-- Error type and message
-- Retryability detection
-- Source tracking (tool, policy, agent, system)
-- Error codes (optional)
+Errors in `tool.response` and `run.end` are structured as:
+- `type`, `message`, `source` (tool, policy, agent, system)
+- `retryable` (auto-detected for e.g. `ConnectionError`, `TimeoutError`, or when "timeout" appears in the message)
+- `code` (optional)
 
-```python
-# Automatic structured error in tool.response:
+Example (in `tool.response` metadata or `run.end` metadata):
+
+```json
 {
     "error": {
         "type": "ConnectionError",
@@ -192,35 +193,27 @@ All events include version information for drift detection:
 
 ### Run Summary Statistics
 
-Every `run.end` event includes comprehensive summary:
+Every `run.end` event includes `metadata.summary`:
 
 ```json
 {
-    "summary": {
-        "tool_calls": {
-            "total": 10,
-            "allowed": 8,
-            "denied": 1,
-            "error": 1,
-            "retried": 2
-        },
-        "latencies": {
-            "avg_tool_ms": 50.2,
-            "avg_policy_ms": 0.5,
-            "total_run_ms": 1500.0
-        },
-        "tasks": {
-            "completed": 3,
-            "failed": 1
-        },
-        "handoffs": 1
+    "metadata": {
+        "success": true,
+        "summary": {
+            "tool_calls": { "total": 10, "allowed": 8, "denied": 1, "error": 1, "retried": 2 },
+            "latencies": { "avg_tool_ms": 50.2, "avg_policy_ms": 0.5, "total_run_ms": 1500.0 },
+            "tasks": { "completed": 3, "failed": 1 },
+            "handoffs": 1
+        }
     }
 }
 ```
 
-### Automatic Retry Logic
+On run failure, `metadata.error` contains the structured error object.
 
-The SDK includes retry infrastructure for tools. When a tool raises a retryable error (ConnectionError, TimeoutError, etc.), the error is automatically structured and marked as retryable. The retry mechanism is in place but currently disabled by default (max_retries=0). This allows for tracking retryable errors while you implement custom retry logic if needed.
+### Retries
+
+The SDK records `attempt` and `retries` on tool events and marks errors as `retryable` when appropriate. Automatic retries are **not** enabled by default (`max_retries=0`). The infrastructure is in place for future use or custom retry logic.
 
 ## API Reference
 
@@ -234,8 +227,8 @@ Initialize an ALM instance.
 - `agent_id` (str, required): Unique agent identifier
 - `env` (str, default="development"): Environment name
 - `mode` (str, default="stdout"): Event sink mode ("stdout" or "http")
-- `endpoint` (str, optional): HTTP endpoint URL (required for http mode)
-- `api_key` (str, optional): API key for HTTP authentication
+- `endpoint` (str, optional): Base URL for HTTP mode (required if `mode="http"`). The SDK POSTs to `/v1/events`.
+- `api_key` (str, optional): API key; sent as `Authorization: Bearer <api_key>` when using HTTP mode
 - `agent_version` (str, optional): Agent version string
 - `policy_version` (str, optional): Policy version string
 - `allowed_tools` (Set[str], optional): Whitelist of allowed tools
@@ -274,9 +267,9 @@ alm = ALM(
     agent_id="research-agent",
     env="production",
     mode="http",
-    endpoint="https://api.example.com/v1/events",
+    endpoint="https://api.example.com",
     api_key="your-api-key",
-    agent_version="1.0.0"
+    agent_version="1.0.0",
 )
 
 @alm.tool("search")
@@ -304,7 +297,7 @@ alm = ALM(
     agent_id="controlled-agent",
     denied_tools={"delete", "modify"},
     allowed_tools={"read", "search"},
-    max_tool_calls_per_run=20
+    max_tool_calls_per_run=20,
 )
 
 @alm.tool("delete")
@@ -349,55 +342,57 @@ with alm.run():
         )
 ```
 
-### Error Handling and Retries
+### Error Handling
 
 ```python
+alm = ALM(agent_id="api-agent", mode="stdout")
+
 @alm.tool("api_call")
-def api_call(endpoint: str):
+def api_call(url: str):
     """API call that may fail."""
-    response = httpx.get(endpoint, timeout=5.0)
+    response = httpx.get(url, timeout=5.0)
     response.raise_for_status()
     return response.json()
 
-# Errors are automatically structured and marked as retryable
-# The SDK tracks retryable errors for monitoring and analytics
-try:
-    result = api_call("https://api.example.com/data")
-except Exception as e:
-    # Handle the error - SDK has already logged it with retryable flag
-    pass
+with alm.run():
+    try:
+        result = api_call("https://api.example.com/data")
+    except Exception:
+        # SDK already emitted tool.response with status="error" and structured error
+        pass
 ```
 
 ## Event Schema
 
-All events follow a consistent schema:
+All events share a common shape. Timestamps are RFC3339 (e.g. `2026-01-21T12:00:00.123Z`).
 
 ```json
 {
-    "timestamp": "2026-01-21T12:00:00Z",
+    "event_id": "550e8400-e29b-41d4-a716-446655440000",
+    "timestamp": "2026-01-21T12:00:00.123Z",
     "event_type": "tool.request",
     "agent_id": "agent-123",
     "env": "production",
     "run_id": "run-456",
     "schema_version": "1.0",
-    "sdk_version": "0.0.3",
+    "sdk_version": "0.1.0",
     "agent_version": "1.0.0",
     "policy_version": "2.0.0",
-    "metadata": {
-        // Event-specific metadata
-    }
+    "metadata": {}
 }
 ```
 
+`event_id` is a UUID per event for idempotency and deduplication.
+
 ### Event Types
 
-- `run.start`: Run initialization
-- `run.end`: Run completion with summary
-- `tool.request`: Tool call initiated
-- `policy.decision`: Policy decision (allow/deny)
-- `tool.response`: Tool call completion
-- `task.start`: Task initialization
-- `task.end`: Task completion
+- `run.start`: Run started
+- `run.end`: Run finished (includes `metadata.summary` and optionally `metadata.error`)
+- `tool.request`: Tool call initiated (`metadata` includes `tool_name`, `tool_call_id`, `args`, etc.)
+- `policy.decision`: Allow or deny (`metadata.decision`, `metadata.tool_call_id`, `metadata.latency_ms`)
+- `tool.response`: Tool completed (`metadata.status`: `success`, `denied`, or `error`; latencies, `attempt`, `retries`)
+- `task.start`: Task started
+- `task.end`: Task finished (success/failure, optional `metadata.error`)
 - `handoff`: Agent-to-agent handoff
 
 ## Development Mode
@@ -425,23 +420,22 @@ Output:
 
 ## Production Mode
 
-For production, use `mode="http"` with your backend endpoint:
+For production, use `mode="http"` with your API base URL:
 
 ```python
 alm = ALM(
     agent_id="prod-agent",
     mode="http",
-    endpoint="https://api.yourcompany.com/v1/events",
+    endpoint="https://api.yourcompany.com",  # Base URL; SDK POSTs to /v1/events
     api_key=os.getenv("ALM_API_KEY"),
-    agent_version=__version__
+    agent_version=__version__,
 )
 ```
 
-Events are automatically batched and sent to the endpoint. The SDK handles:
-- Automatic batching (50 events default)
-- Error handling (won't crash your agent)
-- Authentication headers
-- Retry logic
+Events are batched (default 50) and POSTed to `{endpoint}/v1/events`. The SDK:
+- Buffers events and flushes on batch size or at run end
+- Catches flush failures so the agent does not crash
+- Sends `Authorization: Bearer <api_key>` when `api_key` is set
 
 ## Testing
 
