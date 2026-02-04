@@ -4,7 +4,7 @@
 """Event objects for ALM SDK."""
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .__about__ import __version__ as SDK_VERSION
 
@@ -28,10 +28,8 @@ class Event(BaseModel):
     agent_version: Optional[str] = Field(None, description="Agent version")
     policy_version: Optional[str] = Field(None, description="Policy version")
 
-    class Config:
-        """Pydantic config."""
-
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "event_id": "550e8400-e29b-41d4-a716-446655440000",
                 "timestamp": "2026-01-01T00:00:00.000Z",
@@ -42,6 +40,7 @@ class Event(BaseModel):
                 "metadata": {},
             }
         }
+    )
 
 
 def run_start_event(
