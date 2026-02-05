@@ -1,53 +1,117 @@
-"""Toy agent example demonstrating ALM SDK usage."""
+"""
+Toy agent for r3fresh ALM SDK
+
+What this tests:
+- run.start / run.end with summary stats
+- tool.request / policy.decision / tool.response
+- allow/deny policy (denied tool raises PermissionError)
+- tool latency visibility (simulated sleeps)
+- task.start / task.end
+- handoff event
+- structured errors on tool failure
+"""
+
+from __future__ import annotations
+
+import os
+import time
+from typing import Dict, Any
+
 from r3fresh import ALM
 
 
-def main():
-    """Run the toy agent example."""
-    # Initialize ALM in stdout mode
+def main() -> None:
+    # Toggle these to test different sinks
+    mode = os.getenv("ALM_MODE", "stdout")  # "stdout" or "http"
+    endpoint = os.getenv("ALM_ENDPOINT")    # required if mode == "http"
+    api_key = os.getenv("ALM_API_KEY")      # optional
+
     alm = ALM(
         agent_id="toy-agent-1",
-        env="development",
-        mode="stdout",
-        # Deny the dangerous_tool to demonstrate deny behavior
-        denied_tools={"dangerous_tool"},
+        env=os.getenv("ALM_ENV", "development"),
+        mode=mode,
+        endpoint=endpoint,
+        api_key=api_key,
+        agent_version="0.0.1-toy",
+        policy_version="0.0.1-policy",
+        # Demonstrate policy behavior:
+        allowed_tools={"safe_tool", "flaky_tool", "slow_tool"},  # whitelist
+        denied_tools={"dangerous_tool"},                         # blacklist
+        default_allow=False,                                     # enforce whitelist
+        max_tool_calls_per_run=25,
     )
 
-    # Define two tools
+    # --- Tools ---------------------------------------------------------------
 
     @alm.tool("safe_tool")
     def safe_tool(message: str) -> str:
-        """A safe tool that just echoes a message."""
+        """Always succeeds; quick tool."""
         return f"Safe: {message}"
 
+    @alm.tool("slow_tool")
+    def slow_tool(ms: int) -> str:
+        """Sleeps to make tool latency visible."""
+        time.sleep(ms / 1000.0)
+        return f"Slept {ms}ms"
+
+    @alm.tool("flaky_tool")
+    def flaky_tool(should_fail: bool) -> Dict[str, Any]:
+        """Fails on demand to test structured error capture."""
+        if should_fail:
+            raise ConnectionError("Simulated connection timeout")
+        return {"ok": True}
+
     @alm.tool("dangerous_tool")
-    def dangerous_tool(action: str) -> str:
-        """A dangerous tool that should be denied."""
-        return f"Dangerous action: {action}"
+    def dangerous_tool() -> None:
+        """Should be denied by policy."""
+        # If policy enforcement works, you should never see this line execute.
+        raise RuntimeError("If you see this, policy did not deny the tool!")
 
-    # Run a run context
-    with alm.run(purpose="Demonstrate ALM SDK functionality"):
-        # Call the allowed tool
-        print("Calling safe_tool...")
-        result1 = safe_tool("Hello, World!")
-        print(f"Result: {result1}")
+    # --- Agent logic ---------------------------------------------------------
 
-        # Try to call the denied tool (should raise PermissionError)
-        print("\nTrying to call dangerous_tool...")
-        try:
-            result2 = dangerous_tool("delete everything")
-            print(f"Result: {result2}")
-        except PermissionError as e:
-            print(f"Expected error: {e}")
+    print(f"Mode: {mode}")
+    if mode == "http":
+        print(f"Endpoint: {endpoint!r} (SDK should POST to {endpoint}/v1/events)")
 
-        # Call another safe tool
-        print("\nCalling safe_tool again...")
-        result3 = safe_tool("Goodbye!")
-        print(f"Result: {result3}")
+    with alm.run(purpose="Toy agent smoke test"):
+        # Task 1: happy path tools
+        with alm.task(description="Happy path tools"):
+            print("Calling safe_tool...")
+            print(safe_tool("Hello, World!"))
 
-    # Flush any remaining events
-    alm.flush()
-    print("\nExample completed. Check stdout for JSON events.")
+            print("Calling slow_tool...")
+            print(slow_tool(150))
+
+        # Task 2: denied tool
+        with alm.task(description="Policy deny test"):
+            print("\nTrying to call dangerous_tool...")
+            try:
+                dangerous_tool()
+            except PermissionError as e:
+                print(f"Expected error: {e}")
+
+        # Task 3: error capture
+        with alm.task(description="Error capture test"):
+            print("\nCalling flaky_tool (forced failure)...")
+            try:
+                flaky_tool(True)
+            except Exception as e:
+                # SDK should emit tool.response with status="error" + structured error metadata
+                print(f"Expected failure: {type(e).__name__}: {e}")
+
+        # Handoff (emits a handoff event)
+        alm.handoff(
+            to_agent_id="next-agent",
+            reason="Demonstrate handoff event emission",
+            context={"note": "handoff triggered after tests"},
+        )
+
+    # Optional: explicit flush if you want to confirm manual flushing too
+    try:
+        alm.flush()
+    except Exception:
+        # Your SDK says it should catch flush failures; this is just belt-and-suspenders.
+        pass
 
 
 if __name__ == "__main__":
