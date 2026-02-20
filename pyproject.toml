@@ -14,7 +14,7 @@ authors = [
   { name = "r3fresh", email = "support@r3fresh.dev" },
 ]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
@@ -31,7 +31,10 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://r3fresh.dev"
-Documentation = "https://docs.r3fresh.dev"
+Documentation = "https://r3fresh.dev/docs"
+Dashboard = "https://r3fresh.dev/dashboard"
+Repository = "https://github.com/r3fresh-alm/r3fresh"
+Issues = "https://github.com/r3fresh-alm/r3fresh/issues"
 
 [tool.hatch.version]
 path = "src/r3fresh/__about__.py"

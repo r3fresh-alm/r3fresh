@@ -16,8 +16,11 @@ from __future__ import annotations
 import os
 import time
 from typing import Dict, Any
+from dotenv import load_dotenv
 
 from r3fresh import ALM
+
+load_dotenv()
 
 
 def main() -> None:
@@ -41,7 +44,7 @@ def main() -> None:
         max_tool_calls_per_run=25,
     )
 
-    # --- Tools ---------------------------------------------------------------
+    # Tools
 
     @alm.tool("safe_tool")
     def safe_tool(message: str) -> str:
@@ -64,10 +67,9 @@ def main() -> None:
     @alm.tool("dangerous_tool")
     def dangerous_tool() -> None:
         """Should be denied by policy."""
-        # If policy enforcement works, you should never see this line execute.
         raise RuntimeError("If you see this, policy did not deny the tool!")
 
-    # --- Agent logic ---------------------------------------------------------
+    # Agent logic
 
     print(f"Mode: {mode}")
     if mode == "http":
@@ -96,21 +98,17 @@ def main() -> None:
             try:
                 flaky_tool(True)
             except Exception as e:
-                # SDK should emit tool.response with status="error" + structured error metadata
                 print(f"Expected failure: {type(e).__name__}: {e}")
 
-        # Handoff (emits a handoff event)
         alm.handoff(
             to_agent_id="next-agent",
             reason="Demonstrate handoff event emission",
             context={"note": "handoff triggered after tests"},
         )
 
-    # Optional: explicit flush if you want to confirm manual flushing too
     try:
         alm.flush()
     except Exception:
-        # Your SDK says it should catch flush failures; this is just belt-and-suspenders.
         pass
 
 

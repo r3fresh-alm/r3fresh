@@ -2,8 +2,9 @@
 
 [![PyPI - Version](https://img.shields.io/pypi/v/r3fresh.svg)](https://pypi.org/project/r3fresh)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/r3fresh.svg)](https://pypi.org/project/r3fresh)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Agent Lifecycle Management SDK** – A Python SDK for tracking AI agent execution with policy enforcement, event emission, and structured event data for downstream analytics.
+**Agent Lifecycle Management SDK** – A production-ready Python SDK for tracking AI agent execution with policy enforcement, event emission, and structured event data for downstream analytics.
 
 ## Overview
 
@@ -16,6 +17,21 @@ The SDK provides automatic instrumentation for AI agents, capturing:
 - **Version tracking** (schema, SDK, agent, policy) on every event
 
 All events are emitted automatically. They can be sent to **stdout** (development) or an **HTTP endpoint** (production). The SDK does not perform analytics itself; it produces events for your backend or analytics pipeline.
+
+## Getting Started
+
+To use r3fresh in production with cloud analytics:
+
+1. **Sign up** at [r3fresh.dev](https://r3fresh.dev)
+2. **Get your API key** from the [Dashboard](https://r3fresh.dev/dashboard)
+3. **Install the SDK**: `pip install r3fresh`
+4. **Integrate** using the examples below
+
+The r3fresh platform provides:
+- **Real-time monitoring** dashboard for all your agents
+- **Analytics** with run history, tool usage, and performance metrics
+- **Code Assistant** - AI-powered tool to automatically integrate r3fresh into your existing code
+- **Policy management** and quota tracking
 
 ## Installation
 
@@ -74,8 +90,8 @@ alm = ALM(
     agent_id="unique-agent-id",       # Required: Unique identifier
     env="production",                 # Environment name
     mode="http",                      # "stdout" or "http"
-    endpoint="https://api.example.com",  # Base URL for http mode; SDK POSTs to /v1/events
-    api_key="your-api-key",           # Optional: Sent as Authorization: Bearer <key>
+    endpoint="https://api.r3fresh.dev",  # r3fresh platform API (or your own backend)
+    api_key="your-api-key",           # Get from https://r3fresh.dev/dashboard
     agent_version="1.2.3",            # Optional: Agent version
     policy_version="2.0.0",           # Optional: Policy version
     allowed_tools={"tool1", "tool2"}, # Optional: Whitelist tools
@@ -227,8 +243,8 @@ Initialize an ALM instance.
 - `agent_id` (str, required): Unique agent identifier
 - `env` (str, default="development"): Environment name
 - `mode` (str, default="stdout"): Event sink mode ("stdout" or "http")
-- `endpoint` (str, optional): Base URL for HTTP mode (required if `mode="http"`). The SDK POSTs to `/v1/events`.
-- `api_key` (str, optional): API key; sent as `Authorization: Bearer <api_key>` when using HTTP mode
+- `endpoint` (str, optional): Base URL for HTTP mode (required if `mode="http"`). The SDK POSTs to `/v1/events`. For the r3fresh platform, use `https://api.r3fresh.dev`.
+- `api_key` (str, optional): API key for authentication. Get yours at [r3fresh.dev/dashboard](https://r3fresh.dev/dashboard). Sent as `Authorization: Bearer <api_key>`.
 - `agent_version` (str, optional): Agent version string
 - `policy_version` (str, optional): Policy version string
 - `allowed_tools` (Set[str], optional): Whitelist of allowed tools
@@ -267,7 +283,7 @@ alm = ALM(
     agent_id="research-agent",
     env="production",
     mode="http",
-    endpoint="https://api.example.com",
+    endpoint="https://api.r3fresh.dev",
     api_key="your-api-key",
     agent_version="1.0.0",
 )
@@ -420,14 +436,14 @@ Output:
 
 ## Production Mode
 
-For production, use `mode="http"` with your API base URL:
+For production with the r3fresh platform:
 
 ```python
 alm = ALM(
     agent_id="prod-agent",
     mode="http",
-    endpoint="https://api.yourcompany.com",  # Base URL; SDK POSTs to /v1/events
-    api_key=os.getenv("ALM_API_KEY"),
+    endpoint="https://api.r3fresh.dev",  # r3fresh platform API
+    api_key=os.getenv("ALM_API_KEY"),    # Get from https://r3fresh.dev/dashboard
     agent_version=__version__,
 )
 ```
@@ -436,6 +452,8 @@ Events are batched (default 50) and POSTed to `{endpoint}/v1/events`. The SDK:
 - Buffers events and flushes on batch size or at run end
 - Catches flush failures so the agent does not crash
 - Sends `Authorization: Bearer <api_key>` when `api_key` is set
+
+**Self-hosted option:** You can also run your own event ingestion API. The SDK will POST events to any endpoint that accepts the r3fresh event schema at `/v1/events`.
 
 ## Testing
 
@@ -457,6 +475,14 @@ python examples/toy_agent.py
 - pydantic
 - httpx
 
+## Resources
+
+- **Website**: [r3fresh.dev](https://r3fresh.dev)
+- **Documentation**: [r3fresh.dev/docs](https://r3fresh.dev/docs)
+- **Dashboard**: [r3fresh.dev/dashboard](https://r3fresh.dev/dashboard)
+- **Code Assistant**: [r3fresh.dev/dashboard/code-assistant](https://r3fresh.dev/dashboard/code-assistant) - AI-powered integration helper
+- **GitHub**: [github.com/r3fresh-alm/r3fresh](https://github.com/r3fresh-alm/r3fresh)
+
 ## License
 
 `r3fresh` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
@@ -467,4 +493,6 @@ Contributions are welcome! Please open an issue or submit a pull request.
 
 ## Support
 
-For issues, questions, or feature requests, please contact support@r3fresh.dev.
+For issues, questions, or feature requests:
+- Email: [support@r3fresh.dev](mailto:support@r3fresh.dev)
+- GitHub Issues: [github.com/r3fresh-alm/r3fresh/issues](https://github.com/r3fresh-alm/r3fresh/issues)
