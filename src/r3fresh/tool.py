@@ -19,6 +19,7 @@ from .util import (
 def tool(
     alm_instance: "ALM",  # noqa: F821
     tool_name: Optional[str] = None,
+    telemetry: Optional[Dict[str, Any]] = None,
 ) -> Callable:
     """Decorator factory for wrapping tool functions.
 
@@ -49,8 +50,12 @@ def tool(
 
                 # Normalize args to named parameters for better analytics
                 normalized_args = normalize_args(func, args, kwargs)
-                # Redact sensitive info from normalized args
-                redacted_args = redact_sensitive(normalized_args)
+                # Inputs and results are opt-in; operational metadata is always emitted.
+                redacted_args = (
+                    redact_sensitive(normalized_args)
+                    if alm_instance.telemetry.capture_inputs
+                    else {}
+                )
 
                 # Emit tool.request
                 request_event = tool_request_event(
@@ -63,6 +68,7 @@ def tool(
                     tool_call_id=tool_call_id,
                     args=redacted_args,
                     attempt=attempt,
+                    telemetry=telemetry,
                     agent_version=alm_instance.agent_version,
                     policy_version=alm_instance.policy_version,
                 )
@@ -114,6 +120,7 @@ def tool(
                         retries=retries,
                         error=denied_error,
                         result=None,
+                        telemetry=telemetry,
                         agent_version=alm_instance.agent_version,
                         policy_version=alm_instance.policy_version,
                     )
@@ -180,7 +187,12 @@ def tool(
                         attempt=attempt,
                         retries=retries,
                         error=error,
-                        result=redact_sensitive(result) if result is not None else None,
+                        result=(
+                            redact_sensitive(result)
+                            if alm_instance.telemetry.capture_tool_results
+                            else None
+                        ),
+                        telemetry=telemetry,
                         agent_version=alm_instance.agent_version,
                         policy_version=alm_instance.policy_version,
                     )
@@ -248,6 +260,7 @@ def tool(
                         retries=retries,
                         error=error,
                         result=None,
+                        telemetry=telemetry,
                         agent_version=alm_instance.agent_version,
                         policy_version=alm_instance.policy_version,
                     )

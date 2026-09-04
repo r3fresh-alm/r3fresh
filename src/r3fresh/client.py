@@ -4,7 +4,7 @@
 """Event client for ALM SDK."""
 import json
 import sys
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -20,6 +20,7 @@ class EventClient:
         endpoint: Optional[str] = None,
         api_key: Optional[str] = None,
         batch_size: int = 50,
+        event_context: Optional[Dict[str, Any]] = None,
     ):
         """Initialize event client.
 
@@ -38,6 +39,7 @@ class EventClient:
         self.endpoint = endpoint
         self.api_key = api_key
         self.batch_size = batch_size
+        self.event_context = dict(event_context or {})
         self._queue: List[Event] = []
         self._http_client: Optional[httpx.Client] = None
 
@@ -53,6 +55,8 @@ class EventClient:
 
     def emit(self, event: Event) -> None:
         """Add an event to the queue and flush if batch size reached."""
+        if self.event_context:
+            event = event.model_copy(update={"context": self.event_context})
         self._queue.append(event)
         if len(self._queue) >= self.batch_size:
             self.flush()

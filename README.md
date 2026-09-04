@@ -163,6 +163,35 @@ The SDK automatically captures:
 
 Every event includes a unique `event_id` (UUID) for idempotency and deduplication.
 
+### Rich Telemetry and Privacy
+
+Schema `1.1` adds optional `llm.request`, `llm.response`, `retrieval.request`,
+`retrieval.response`, and `evaluation.result` events. LLM responses can include
+provider/model, tokens, context use, latency, cost, attempts, retries, and finish
+reason. Retrieval events carry aggregate counts and similarity metrics, never raw
+documents by default. Evaluation events support human, deterministic, LLM, or
+external scores.
+
+```python
+from r3fresh import ALM
+from r3fresh.telemetry import TelemetryConfig
+
+alm = ALM("research-agent", telemetry=TelemetryConfig(
+    context={"deployment_id": "deploy-42", "git_sha": "abc123"},
+))
+with alm.run(purpose="Research", metadata={"workflow": "research-v2"}):
+    alm.llm_request(provider="openai", model="example-model")
+    alm.llm_response(input_tokens=18240, output_tokens=920, total_latency_ms=2520,
+                     estimated_cost_usd=0.084)
+    alm.retrieval_response(retriever_name="knowledge-base", documents_returned=5)
+    alm.evaluation_result(evaluator_name="groundedness", score=0.92, passed=True)
+```
+
+Inputs, tool results, prompts, retrieval queries, feedback, and infrastructure data
+are disabled by default. Enable only what is needed with `TelemetryConfig`; known
+sensitive keys such as tokens, passwords, secrets, and API keys are redacted when
+capture is enabled. Never place authorization headers or API keys in metadata.
+
 ### Policy Enforcement
 
 Enforce tool usage policies:

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 """Run context manager for ALM SDK."""
 import time
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from .events import run_end_event, run_start_event
 from .util import create_structured_error, new_id, utc_now_iso
@@ -12,7 +12,10 @@ from .util import create_structured_error, new_id, utc_now_iso
 class Run:
     """Context manager for agent runs."""
 
-    def __init__(self, alm_instance: "ALM", purpose: Optional[str] = None):  # noqa: F821
+    def __init__(
+        self, alm_instance: "ALM", purpose: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ):  # noqa: F821
         """Initialize a run.
 
         Args:
@@ -22,6 +25,7 @@ class Run:
         self.alm = alm_instance
         self.run_id = None
         self.purpose = purpose
+        self.metadata = metadata or {}
         self._started = False
         self._start_time: Optional[float] = None
 
@@ -36,6 +40,13 @@ class Run:
         self._tasks_completed = 0
         self._tasks_failed = 0
         self._handoffs = 0
+        self._total_input_tokens = 0
+        self._total_output_tokens = 0
+        self._total_tokens = 0
+        self._total_estimated_cost_usd = 0.0
+        self._total_llm_calls = 0
+        self._total_retrieval_calls = 0
+        self._retries = 0
 
     def __enter__(self):
         """Enter the run context - emit run.start event."""
@@ -50,6 +61,7 @@ class Run:
             env=self.alm.env,
             run_id=self.run_id,
             purpose=self.purpose,
+            custom_metadata=self.metadata,
             agent_version=self.alm.agent_version,
             policy_version=self.alm.policy_version,
         )
@@ -106,6 +118,14 @@ class Run:
             tasks_completed=self._tasks_completed,
             tasks_failed=self._tasks_failed,
             handoffs=self._handoffs,
+            total_input_tokens=self._total_input_tokens,
+            total_output_tokens=self._total_output_tokens,
+            total_tokens=self._total_tokens,
+            total_estimated_cost_usd=self._total_estimated_cost_usd,
+            total_llm_calls=self._total_llm_calls,
+            total_retrieval_calls=self._total_retrieval_calls,
+            retries=self._retries,
+            custom_metadata=self.metadata,
         )
         self.alm.client.emit(event)
 
@@ -150,3 +170,19 @@ class Run:
     def record_handoff(self) -> None:
         """Record a handoff."""
         self._handoffs += 1
+
+    def record_llm_call(
+        self, input_tokens: Optional[int], output_tokens: Optional[int],
+        total_tokens: Optional[int], estimated_cost_usd: Optional[float], retries: int,
+    ) -> None:
+        """Accumulate optional LLM usage for the enclosing run."""
+        self._total_llm_calls += 1
+        self._total_input_tokens += input_tokens or 0
+        self._total_output_tokens += output_tokens or 0
+        self._total_tokens += total_tokens if total_tokens is not None else (input_tokens or 0) + (output_tokens or 0)
+        self._total_estimated_cost_usd += estimated_cost_usd or 0.0
+        self._retries += retries
+
+    def record_retrieval_call(self) -> None:
+        """Accumulate a retrieval operation for the enclosing run."""
+        self._total_retrieval_calls += 1
